@@ -1,11 +1,11 @@
 # Use official PHP 8.2 image with Apache
 FROM php:8.2-apache
 
-# Set working directory
 WORKDIR /var/www/html
 
 # Install system dependencies and PHP extensions
 RUN apt-get update && apt-get install -y \
+    libpq-dev \
     libzip-dev \
     unzip \
     git \
@@ -27,15 +27,14 @@ COPY --from=composer:2.6 /usr/bin/composer /usr/bin/composer
 # Copy composer files first for caching
 COPY composer.json composer.lock ./
 
-# Install dependencies (without dev)
+# Install dependencies
 RUN composer install --no-dev --optimize-autoloader
 
 # Copy the full Laravel project
 COPY . .
 
 # Run post-autoload scripts
-RUN composer dump-autoload --optimize && \
-    composer run-script post-autoload-dump || true
+RUN composer dump-autoload --optimize && composer run-script post-autoload-dump || true
 
 # Clear Laravel caches
 RUN php artisan config:clear || true && \
@@ -43,7 +42,7 @@ RUN php artisan config:clear || true && \
     php artisan route:clear || true && \
     php artisan view:clear || true
 
-# Fix permissions for storage and bootstrap/cache
+# Set permissions
 RUN chown -R www-data:www-data storage bootstrap/cache
 
 # Expose Apache port
