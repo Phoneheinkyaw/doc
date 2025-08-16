@@ -6,38 +6,33 @@ RUN apt-get update && apt-get install -y \
     unzip git curl libpng-dev libjpeg-dev libfreetype6-dev libonig-dev libzip-dev \
     && docker-php-ext-install pdo pdo_mysql mbstring bcmath zip gd
 
-# Enable Apache mod_rewrite
+# Enable Apache mod_rewrite for Laravel
 RUN a2enmod rewrite
 
 # Set working directory
 WORKDIR /var/www/html
 
-# Copy only composer files first (for caching)
+# Copy composer first (for better caching)
 COPY composer.json composer.lock ./
 
-# Install Composer binary
+# Install Composer
 COPY --from=composer:2.6 /usr/bin/composer /usr/bin/composer
+RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist || true
 
-# Install dependencies WITHOUT running artisan scripts
-RUN composer install --no-dev --optimize-autoloader --no-scripts
-
-# Now copy the whole Laravel project
+# Copy the whole Laravel project
 COPY . .
 
-# Run composer scripts AFTER project files are present
-RUN composer dump-autoload --optimize && \
-    composer run-script post-autoload-dump || true
+# Cache Laravel configs (ignore if no .env yet, won't break build)
+RUN php artisan config:clear || true && \
+    php artisan cache:clear || true && \
+    php artisan route:clear || true && \
+    php artisan view:clear || true
 
-# Cache Laravel configs
-RUN php artisan config:cache && \
-    php artisan route:cache && \
-    php artisan view:cache || true
-
-# Fix permissions
+# Fix permissions for Laravel
 RUN chown -R www-data:www-data storage bootstrap/cache
 
 # Expose Apache port
 EXPOSE 80
 
-# Start Apache
-CMD ["apache2-foreground"]
+# Start Apache + Run migrations on container start
+CMD php artisan migrate --force && apache2-foreground
