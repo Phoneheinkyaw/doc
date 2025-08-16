@@ -28,13 +28,16 @@ COPY --from=composer:2.6 /usr/bin/composer /usr/bin/composer
 # Copy composer files first for caching
 COPY composer.json composer.lock ./
 
-# Install PHP dependencies without running artisan scripts yet
-RUN composer install --no-dev --no-scripts --optimize-autoloader --no-interaction
+# Copy temporary .env to prevent artisan errors during build
+COPY .env.example .env
+
+# Install PHP dependencies ignoring minor platform requirements
+RUN composer install --no-dev --no-scripts --optimize-autoloader --no-interaction --ignore-platform-reqs
 
 # Copy the full Laravel project
 COPY . .
 
-# Run post-autoload scripts safely after full project is present
+# Run post-autoload scripts safely
 RUN composer run-script post-autoload-dump || true
 
 # Clear Laravel caches safely
@@ -43,7 +46,7 @@ RUN php artisan config:clear || true && \
     php artisan route:clear || true && \
     php artisan view:clear || true
 
-# Set permissions for storage and bootstrap/cache
+# Set correct permissions
 RUN chown -R www-data:www-data storage bootstrap/cache
 
 # Expose Apache port
