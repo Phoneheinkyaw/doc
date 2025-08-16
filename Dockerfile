@@ -1,4 +1,4 @@
-# Use official PHP 8.2 image with Apache
+# Use official PHP 8.2 Apache image
 FROM php:8.2-apache
 
 # Set working directory
@@ -28,7 +28,7 @@ COPY --from=composer:2.6 /usr/bin/composer /usr/bin/composer
 # Copy composer files first for caching
 COPY composer.json composer.lock ./
 
-# Create a temporary dummy .env so artisan commands won't fail
+# Create a temporary dummy .env so artisan commands won't fail during build
 RUN cat <<EOF > .env
 APP_NAME=Laravel
 APP_ENV=local
@@ -44,8 +44,8 @@ DB_USERNAME=root
 DB_PASSWORD=root
 EOF
 
-# Install PHP dependencies ignoring minor platform requirements
-RUN composer install --no-dev --no-scripts --optimize-autoloader --no-interaction --ignore-platform-reqs
+# Install PHP dependencies (ignore minor platform requirements)
+RUN composer install --no-dev --optimize-autoloader --no-scripts --no-interaction --ignore-platform-reqs
 
 # Copy the full Laravel project
 COPY . .
@@ -65,5 +65,5 @@ RUN chown -R www-data:www-data storage bootstrap/cache
 # Expose Apache port
 EXPOSE 80
 
-# Run migrations automatically and start Apache
+# Run migrations automatically on start and start Apache
 CMD php artisan migrate --force || true && apache2-foreground
