@@ -28,8 +28,19 @@ COPY --from=composer:2.6 /usr/bin/composer /usr/bin/composer
 # Copy composer files first for caching
 COPY composer.json composer.lock ./
 
-# Copy temporary .env to prevent artisan errors during build
-COPY .env.example .env
+# Create a temporary dummy .env so artisan commands won't fail
+RUN echo "APP_NAME=Laravel
+APP_ENV=local
+APP_KEY=
+APP_DEBUG=true
+APP_URL=http://localhost
+
+DB_CONNECTION=pgsql
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_DATABASE=laravel
+DB_USERNAME=root
+DB_PASSWORD=root" > .env
 
 # Install PHP dependencies ignoring minor platform requirements
 RUN composer install --no-dev --no-scripts --optimize-autoloader --no-interaction --ignore-platform-reqs
