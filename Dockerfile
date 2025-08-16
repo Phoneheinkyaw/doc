@@ -1,66 +1,38 @@
-# Use official PHP 8.2 Apache image
-FROM php:8.2-apache
+# Stage 0: Build Laravel app
+FROM php:8.2-apache AS laravel-app
 
-# Set working directory to match Laravel's public/index.php
+# Set working directory
 WORKDIR /var/www/html
 
 # Install system dependencies and PHP extensions
 RUN apt-get update && apt-get install -y \
-    libpq-dev \
-    libzip-dev \
-    unzip \
-    git \
-    curl \
-    libpng-dev \
-    libjpeg-dev \
-    libfreetype6-dev \
-    libonig-dev \
-    libxml2-dev \
+    unzip git curl libpng-dev libjpeg-dev libfreetype6-dev libonig-dev libzip-dev libpq-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install pdo pdo_pgsql mbstring exif pcntl bcmath gd zip
+    && docker-php-ext-install pdo pdo_mysql pdo_pgsql mbstring bcmath zip gd exif pcntl \
+    && a2enmod rewrite \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Enable Apache mod_rewrite
-RUN a2enmod rewrite
+# Copy composer files first for caching
+COPY composer.json composer.lock ./
 
 # Install Composer
 COPY --from=composer:2.6 /usr/bin/composer /usr/bin/composer
+RUN composer install --no-dev --no-scripts --optimize-autoloader --ignore-platform-reqs
 
-# Copy full Laravel project
+# Copy the rest of the application
 COPY . .
 
-# Create temporary dummy .env during build
-RUN cat <<EOF > .env
-APP_NAME=Laravel
-APP_ENV=local
-APP_KEY=
-APP_DEBUG=true
-APP_URL=http://localhost
+# Fix permissions
+RUN chown -R www-data:www-data storage bootstrap/cache
 
-DB_CONNECTION=pgsql
-DB_HOST=127.0.0.1
-DB_PORT=5432
-DB_DATABASE=laravel
-DB_USERNAME=root
-DB_PASSWORD=root
-EOF
-
-# Install PHP dependencies safely
-RUN composer install --no-dev --optimize-autoloader --no-scripts --no-interaction --ignore-platform-reqs
-
-# Run post-autoload scripts safely
-RUN composer run-script post-autoload-dump || true
-
-# Clear Laravel caches safely
+# Clear caches (safe)
 RUN php artisan config:clear || true && \
     php artisan cache:clear || true && \
     php artisan route:clear || true && \
     php artisan view:clear || true
 
-# Set correct permissions
-RUN chown -R www-data:www-data storage bootstrap/cache
-
 # Expose Apache port
 EXPOSE 80
 
-# Run migrations automatically on start and start Apache
-CMD php artisan migrate --force || true && apache2-foreground
+# Start Apache
+CMD ["apache2-foreground"]
