@@ -1,7 +1,7 @@
 # Use official PHP with Apache
 FROM php:8.1-apache
 
-# Enable required PHP extensions and Apache modules
+# Install required system packages and PHP extensions
 RUN apt-get update && apt-get install -y \
     libpng-dev \
     libjpeg-dev \
@@ -23,22 +23,26 @@ WORKDIR /var/www/html
 # Install Composer
 COPY --from=composer:2.6 /usr/bin/composer /usr/bin/composer
 
-# Copy only composer files first for caching
+# Copy composer files first (for better build caching)
 COPY composer.json composer.lock ./
 
-# Install dependencies
-RUN composer install --no-dev --optimize-autoloader
+# Install PHP dependencies (ignore scripts during build)
+RUN composer install --no-dev --optimize-autoloader --no-scripts --no-progress --no-interaction
 
-# Copy the whole Laravel project
+# Copy the entire application
 COPY . .
 
-# Clear caches
+# Run post-autoload scripts AFTER copying full code (fixes artisan errors)
+RUN composer dump-autoload --optimize && \
+    composer run-script post-autoload-dump || true
+
+# Clear Laravel caches
 RUN php artisan config:clear || true && \
     php artisan cache:clear || true && \
     php artisan route:clear || true && \
     php artisan view:clear || true
 
-# Set permissions for storage and bootstrap/cache
+# Fix permissions
 RUN chown -R www-data:www-data storage bootstrap/cache
 
 # Expose Apache port
