@@ -29,7 +29,8 @@ COPY --from=composer:2.6 /usr/bin/composer /usr/bin/composer
 COPY composer.json composer.lock ./
 
 # Create a temporary dummy .env so artisan commands won't fail
-RUN echo "APP_NAME=Laravel
+RUN cat <<EOF > .env
+APP_NAME=Laravel
 APP_ENV=local
 APP_KEY=
 APP_DEBUG=true
@@ -40,7 +41,8 @@ DB_HOST=127.0.0.1
 DB_PORT=5432
 DB_DATABASE=laravel
 DB_USERNAME=root
-DB_PASSWORD=root" > .env
+DB_PASSWORD=root
+EOF
 
 # Install PHP dependencies ignoring minor platform requirements
 RUN composer install --no-dev --no-scripts --optimize-autoloader --no-interaction --ignore-platform-reqs
