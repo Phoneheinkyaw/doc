@@ -12,13 +12,11 @@ RUN a2enmod rewrite
 # Set working directory
 WORKDIR /var/www/html
 
-# Copy composer binary
-COPY --from=composer:2.6 /usr/bin/composer /usr/bin/composer
-
-# Copy only composer files first (for caching)
+# Copy composer first (better caching)
 COPY composer.json composer.lock ./
 
-# Install PHP dependencies
+# Install Composer
+COPY --from=composer:2.6 /usr/bin/composer /usr/bin/composer
 RUN composer install --no-dev --optimize-autoloader
 
 # Now copy the whole Laravel project
@@ -27,8 +25,14 @@ COPY . .
 # Fix permissions
 RUN chown -R www-data:www-data storage bootstrap/cache
 
+# Run Laravel setup tasks
+RUN php artisan key:generate && \
+    php artisan config:cache && \
+    php artisan route:cache && \
+    php artisan view:cache
+
 # Expose Apache port
 EXPOSE 80
 
-# Start Apache (don’t run artisan here, safer to run manually on Render)
+# Start Apache
 CMD ["apache2-foreground"]
