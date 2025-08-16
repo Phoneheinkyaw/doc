@@ -1,7 +1,7 @@
 # Use official PHP 8.2 Apache image
 FROM php:8.2-apache
 
-# Set working directory
+# Set working directory to match Laravel's index.php
 WORKDIR /var/www/html
 
 # Install system dependencies and PHP extensions
@@ -25,10 +25,10 @@ RUN a2enmod rewrite
 # Install Composer
 COPY --from=composer:2.6 /usr/bin/composer /usr/bin/composer
 
-# Copy composer files first for caching
-COPY composer.json composer.lock ./
+# Copy entire Laravel project first
+COPY . .
 
-# Create a temporary dummy .env so artisan commands won't fail during build
+# Create a temporary dummy .env so artisan commands won't fail
 RUN cat <<EOF > .env
 APP_NAME=Laravel
 APP_ENV=local
@@ -44,11 +44,8 @@ DB_USERNAME=root
 DB_PASSWORD=root
 EOF
 
-# Install PHP dependencies (ignore minor platform requirements)
+# Install PHP dependencies ignoring platform requirements
 RUN composer install --no-dev --optimize-autoloader --no-scripts --no-interaction --ignore-platform-reqs
-
-# Copy the full Laravel project
-COPY . .
 
 # Run post-autoload scripts safely
 RUN composer run-script post-autoload-dump || true
