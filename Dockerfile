@@ -1,6 +1,7 @@
-# Use official PHP 8.2 image with Apache
+# Use official PHP 8.2 with Apache
 FROM php:8.2-apache
 
+# Set working directory
 WORKDIR /var/www/html
 
 # Install system dependencies and PHP extensions
@@ -24,29 +25,29 @@ RUN a2enmod rewrite
 # Install Composer
 COPY --from=composer:2.6 /usr/bin/composer /usr/bin/composer
 
-# Copy composer files first for caching
+# Copy only composer files first for caching
 COPY composer.json composer.lock ./
 
-# Install dependencies
-RUN composer install --no-dev --optimize-autoloader
+# Install dependencies without running scripts yet
+RUN composer install --no-dev --no-scripts --optimize-autoloader --no-interaction
 
-# Copy the full Laravel project
+# Copy full Laravel project
 COPY . .
 
-# Run post-autoload scripts
-RUN composer dump-autoload --optimize && composer run-script post-autoload-dump || true
+# Run post-autoload scripts AFTER full code exists
+RUN composer run-script post-autoload-dump || true
 
-# Clear Laravel caches
+# Clear caches safely
 RUN php artisan config:clear || true && \
     php artisan cache:clear || true && \
     php artisan route:clear || true && \
     php artisan view:clear || true
 
-# Set permissions
+# Set correct permissions
 RUN chown -R www-data:www-data storage bootstrap/cache
 
 # Expose Apache port
 EXPOSE 80
 
-# Run migrations automatically, then start Apache
+# Run migrations automatically then start Apache
 CMD php artisan migrate --force || true && apache2-foreground
