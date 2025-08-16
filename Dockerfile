@@ -1,38 +1,39 @@
-# Use official PHP with Apache
-FROM php:8.1-apache
+# Use official PHP 8.2 image with Apache
+FROM php:8.2-apache
 
-# Install required system packages and PHP extensions
+# Set working directory
+WORKDIR /var/www/html
+
+# Install system dependencies and PHP extensions
 RUN apt-get update && apt-get install -y \
+    libzip-dev \
+    unzip \
+    git \
+    curl \
     libpng-dev \
     libjpeg-dev \
     libfreetype6-dev \
     libonig-dev \
     libxml2-dev \
-    zip \
-    unzip \
-    git \
-    curl \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install pdo pdo_mysql mbstring exif pcntl bcmath gd
+    && docker-php-ext-install pdo pdo_pgsql mbstring exif pcntl bcmath gd zip
 
+# Enable Apache mod_rewrite
 RUN a2enmod rewrite
-
-# Set working directory
-WORKDIR /var/www/html
 
 # Install Composer
 COPY --from=composer:2.6 /usr/bin/composer /usr/bin/composer
 
-# Copy composer files first (for better build caching)
+# Copy composer files first for caching
 COPY composer.json composer.lock ./
 
-# Install PHP dependencies (ignore scripts during build)
-RUN composer install --no-dev --optimize-autoloader --no-scripts --no-progress --no-interaction
+# Install dependencies (without dev)
+RUN composer install --no-dev --optimize-autoloader
 
-# Copy the entire application
+# Copy the full Laravel project
 COPY . .
 
-# Run post-autoload scripts AFTER copying full code (fixes artisan errors)
+# Run post-autoload scripts
 RUN composer dump-autoload --optimize && \
     composer run-script post-autoload-dump || true
 
@@ -42,11 +43,11 @@ RUN php artisan config:clear || true && \
     php artisan route:clear || true && \
     php artisan view:clear || true
 
-# Fix permissions
+# Fix permissions for storage and bootstrap/cache
 RUN chown -R www-data:www-data storage bootstrap/cache
 
 # Expose Apache port
 EXPOSE 80
 
-# Run migrations, then start Apache
+# Run migrations automatically, then start Apache
 CMD php artisan migrate --force || true && apache2-foreground
